@@ -45,10 +45,6 @@ class ConvivaProvider extends BaseProvider
             {
                 "key": "event_info",
                 "name": "Event Info"
-            },
-            {
-                "key": "event_properties",
-                "name": "Event Properties"
             }
         ];
     }
@@ -164,25 +160,36 @@ class ConvivaProvider extends BaseProvider
                 "group": "event_info"
             });
 
-            if (event.st !== undefined || event.time !== undefined) {
-                eventData.push({
-                    "key": "event_timestamp",
-                    "field": "Event Timestamp",
-                    "value": (event.st || event.time).toString(),
-                    "group": "event_info"
-                });
-            }
-
-            // Extract custom event attributes
-            const attributes = event.p || event.attr || {};
-            Object.entries(attributes).forEach(([attrKey, attrVal]) => {
-                if (attrVal !== undefined && attrVal !== null) {
-                    eventData.push({
-                        "key": `event_attr_${attrKey}`,
-                        "field": attrKey,
-                        "value": typeof attrVal === "object" ? JSON.stringify(attrVal) : attrVal.toString(),
-                        "group": "event_properties"
-                    });
+            // Map all event keys & values to the event_info group
+            Object.entries(event).forEach(([key, val]) => {
+                if (val !== undefined && val !== null) {
+                    if (key === "p" || key === "attr") {
+                        // Extract attributes inside sub-object/sub-array
+                        Object.entries(val).forEach(([attrKey, attrVal]) => {
+                            if (attrVal !== undefined && attrVal !== null) {
+                                eventData.push({
+                                    "key": `event_attr_${attrKey}`,
+                                    "field": attrKey,
+                                    "value": typeof attrVal === "object" ? JSON.stringify(attrVal) : attrVal.toString(),
+                                    "group": "event_info"
+                                });
+                            }
+                        });
+                    } else {
+                        // Standard event fields (t, st, name, time, etc.)
+                        let fieldName = key;
+                        if (key === "t" || key === "name") {
+                            fieldName = "Event Name";
+                        } else if (key === "st" || key === "time") {
+                            fieldName = "Event Timestamp";
+                        }
+                        eventData.push({
+                            "key": `event_${key}`,
+                            "field": fieldName,
+                            "value": typeof val === "object" ? JSON.stringify(val) : val.toString(),
+                            "group": "event_info"
+                        });
+                    }
                 }
             });
 

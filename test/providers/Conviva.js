@@ -52,9 +52,16 @@ test("OmnibugProvider returns Conviva multiple events", t => {
 
     let eventIndex1 = results[0].data.find(r => r.key === "event_index");
     t.is(eventIndex1.value, "1");
+    t.is(eventIndex1.group, "event_info");
 
     let bitrate = results[0].data.find(r => r.key === "event_attr_bitrate");
     t.is(bitrate.value, "4500");
+    t.is(bitrate.group, "event_info");
+
+    let eventType1 = results[0].data.find(r => r.key === "event_t");
+    t.is(eventType1.value, "playing");
+    t.is(eventType1.field, "Event Name");
+    t.is(eventType1.group, "event_info");
 
     t.is(results[1].provider.key, "CONVIVA");
     let reqType2 = results[1].data.find(r => r.key === "omnibug_requestType");
@@ -62,4 +69,5 @@ test("OmnibugProvider returns Conviva multiple events", t => {
 
     let eventIndex2 = results[1].data.find(r => r.key === "event_index");
     t.is(eventIndex2.value, "2");
+    t.is(eventIndex2.group, "event_info");
 });
