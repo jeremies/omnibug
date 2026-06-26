@@ -11,7 +11,7 @@ class ConvivaProvider extends BaseProvider
     {
         super();
         this._key        = "CONVIVA";
-        this._pattern    = /cws\.conviva\.com/;
+        this._pattern    = /(cws|ts-testonly)\.conviva\.com/;
         this._name       = "Conviva";
         this._type       = "analytics";
         this._keywords   = ["conviva", "cws"];
