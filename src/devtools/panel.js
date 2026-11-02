@@ -321,8 +321,12 @@ window.Omnibug = (() => {
         event.preventDefault();
         filters = { "providers": {}, "account": "", "accountType": "contains" };
         Object.keys(allProviders).forEach((key) => {
-            filters.providers[key] = true;
+            filters.providers[key] = false;
         });
+        let selectAllInput = d.getElementById("provider-select-all");
+        if (selectAllInput) {
+            selectAllInput.checked = false;
+        }
         buildProviderFilterPanel();
     });
 
@@ -333,10 +337,12 @@ window.Omnibug = (() => {
             enabledProviders = [];
 
         Object.entries(filters.providers).forEach((pair) => {
-            if (pair[1]) {
-                enabledProviders.push(pair[0]);
-            } else {
-                disabledProviders.push(pair[0]);
+            if (settings.providers[pair[0]] && settings.providers[pair[0]].enabled) {
+                if (pair[1]) {
+                    enabledProviders.push(pair[0]);
+                } else {
+                    disabledProviders.push(pair[0]);
+                }
             }
         });
 
@@ -389,7 +395,7 @@ window.Omnibug = (() => {
     });
     d.getElementById("provider-search").addEventListener("input", (event) => {
         let searchTerm = (event.target.value || "").substring(0, 20),
-            providers = d.querySelectorAll("#filter-providers > li");
+            providers = d.querySelectorAll("#filter-providers > li[data-provider]");
 
         if (searchTerm) {
             let results = providerSearch.search(searchTerm);
@@ -567,9 +573,9 @@ window.Omnibug = (() => {
     });
 
 
-    // Setup our providers in our filters list
+    // Setup our providers in our filters list (unchecked by default)
     Object.keys(allProviders).forEach((key) => {
-        filters.providers[key] = true;
+        filters.providers[key] = false;
     });
 
     // Load up the default settings
@@ -1140,6 +1146,26 @@ window.Omnibug = (() => {
             d.body.classList.toggle("persist-disabled", !persist);
         }
 
+        // Delete existing captured requests for disabled providers from DOM and recordedData
+        const disabledProviderKeys = Object.keys(settings.providers || {}).filter((key) => {
+            return !settings.providers[key].enabled;
+        });
+
+        if (disabledProviderKeys.length) {
+            disabledProviderKeys.forEach((providerKey) => {
+                let elements = requestPanel.querySelectorAll(`.request[data-provider="${providerKey}"]`);
+                elements.forEach((el) => el.remove());
+            });
+
+            recordedData = recordedData.filter((r) => {
+                return !(r.event === "webRequest" && r.provider && disabledProviderKeys.includes(r.provider.key));
+            });
+
+            if (requestPanel.querySelectorAll(".request, .navigation").length === 0) {
+                noRequests.classList.remove("d-none");
+            }
+        }
+
         // Build the filter list
         buildProviderFilterPanel();
 
@@ -1242,66 +1268,83 @@ window.Omnibug = (() => {
      * Build the provider filter panel
      */
     function buildProviderFilterPanel() {
-        let providerList = d.getElementById("filter-providers");
+        let providerList = d.getElementById("filter-providers"),
+            selectAllInput = d.getElementById("provider-select-all");
 
         // Clear any existing providers
         clearChildren(providerList);
 
-        // Create an entry for _all_ of our providers
-        for (let providerKey in allProviders) {
-            if (!Object.prototype.hasOwnProperty.call(allProviders, providerKey)) { continue; }
+        // Filter for enabled providers only
+        let enabledProviders = Object.keys(allProviders).filter((providerKey) => {
+            return settings.providers[providerKey] && settings.providers[providerKey].enabled;
+        });
 
-            // Create our DOM elements
-            let input = createElement("input", {
-                    "attributes": {
-                        "type": "checkbox",
-                        "id": `filter-provider-${providerKey}`,
-                        "value": providerKey
-                    },
-                }),
-                span = createElement("span", {
-                    "text": allProviders[providerKey].name
-                }),
-                label = createElement("label", {
-                    "classes": ["noselect"],
-                    "attributes": {
-                        "for": `filter-provider-${providerKey}`
-                    },
-                    "children": [input, span]
-                }),
-                wrapper = createElement("li", {
-                    "attributes": {
-                        "data-provider": providerKey
-                    },
-                    "children": [label]
+        if (enabledProviders.length === 0) {
+            let emptyItem = createElement("li", {
+                "classes": ["empty-providers", "text-gray", "p-2"],
+                "text": "No providers enabled in Settings."
+            });
+            providerList.appendChild(emptyItem);
+            if (selectAllInput) {
+                selectAllInput.checked = false;
+            }
+        } else {
+            for (let providerKey of enabledProviders) {
+                // Create our DOM elements
+                let input = createElement("input", {
+                        "attributes": {
+                            "type": "checkbox",
+                            "id": `filter-provider-${providerKey}`,
+                            "value": providerKey
+                        },
+                    }),
+                    span = createElement("span", {
+                        "text": allProviders[providerKey].name
+                    }),
+                    label = createElement("label", {
+                        "classes": ["noselect"],
+                        "attributes": {
+                            "for": `filter-provider-${providerKey}`
+                        },
+                        "children": [input, span]
+                    }),
+                    wrapper = createElement("li", {
+                        "attributes": {
+                            "data-provider": providerKey
+                        },
+                        "children": [label]
+                    });
+
+                input.checked = Boolean(filters.providers[providerKey]);
+
+                providerList.appendChild(wrapper);
+
+                // Add our event listener
+                input.addEventListener("input", (event) => {
+                    let checkbox = event.target,
+                        key = checkbox.value;
+                    filters.providers[key] = checkbox.checked;
+                    tracker.track(["send", "event", "filter requests", ((checkbox.checked) ? "show" : "hide") + "provider", key]);
+                    if (selectAllInput) {
+                        selectAllInput.checked = enabledProviders.every(k => filters.providers[k]);
+                    }
+                    updateFiltersStyles();
                 });
 
-            // Check if the user has the provider enabled or not
-            if (settings.providers[providerKey] && !settings.providers[providerKey].enabled) {
-                label.setAttribute("title", "This provider is currently disabled and requests for this provider will never be shown. You can re-enable it within the settings");
-                let warningIcon = createElement("i", {
-                    "classes": ["fas", "fa-exclamation-triangle"]
-                });
-                span.appendChild(warningIcon);
-            } else {
-                if (filters.providers[providerKey]) {
-                    input.checked = true;
-                }
+                filters.providers[providerKey] = input.checked;
             }
 
-            providerList.appendChild(wrapper);
-
-            // Add our event listener
-            input.addEventListener("input", (event) => {
-                let checkbox = event.target,
-                    providerKey = checkbox.value;
-                filters.providers[providerKey] = checkbox.checked;
-                tracker.track(["send", "event", "filter requests", ((checkbox.checked) ? "show" : "hide") + "provider", providerKey]);
-                updateFiltersStyles();
-            });
-
-            filters.providers[providerKey] = input.checked;
+            if (selectAllInput) {
+                selectAllInput.checked = enabledProviders.every(k => filters.providers[k]);
+            }
         }
+
+        // Ensure any disabled providers have false in filters.providers
+        Object.keys(allProviders).forEach((providerKey) => {
+            if (!settings.providers[providerKey] || !settings.providers[providerKey].enabled) {
+                filters.providers[providerKey] = false;
+            }
+        });
 
         d.getElementById("filter-account").value = filters.account || "";
         d.getElementById("filter-account-type").value = ["contains", "starts", "ends", "exact"].includes(filters.accountType) ? filters.accountType : "contains";

@@ -126,6 +126,18 @@ class OmnibugSettings {
                                 settings[this.storage_key].providers[key] = Object.assign(this.defaults.providers[key], settings[this.storage_key].providers[key]);
                             });
                         }
+                        if (
+                            settings[this.storage_key].defaultFilters &&
+                            Array.isArray(settings[this.storage_key].defaultFilters.providers) &&
+                            typeof settings[this.storage_key].providers === "object"
+                        ) {
+                            settings[this.storage_key].defaultFilters.providers = settings[this.storage_key].defaultFilters.providers.filter((providerKey) => {
+                                return (
+                                    settings[this.storage_key].providers[providerKey] &&
+                                    settings[this.storage_key].providers[providerKey].enabled
+                                );
+                            });
+                        }
                     }
                 } catch (e) {
                     console.error(e);
@@ -146,6 +158,25 @@ class OmnibugSettings {
     save(newSettings = {}) {
         let settings = {};
         settings[this.storage_key] = Object.assign(this.defaults, newSettings);
+
+        // Clear any disabled providers from defaultFilters.providers if present
+        if (
+            settings[this.storage_key].defaultFilters &&
+            Array.isArray(settings[this.storage_key].defaultFilters.providers) &&
+            typeof settings[this.storage_key].providers === "object" &&
+            settings[this.storage_key].providers !== null
+        ) {
+            settings[this.storage_key].defaultFilters.providers = settings[this.storage_key].defaultFilters.providers.filter((providerKey) => {
+                return (
+                    settings[this.storage_key].providers[providerKey] &&
+                    settings[this.storage_key].providers[providerKey].enabled
+                );
+            });
+            if (newSettings.defaultFilters) {
+                newSettings.defaultFilters.providers = settings[this.storage_key].defaultFilters.providers;
+            }
+        }
+
         this.browser.storage[this.storage_type].set(settings);
 
         // Return the merged settings object

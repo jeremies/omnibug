@@ -416,9 +416,10 @@ nav.navbar {
   input {
     margin-right: .5em;
   }
-  label .fa-exclamation-triangle {
-    margin-left: 1em;
-    color: $warning-color-dark;
+  .empty-providers {
+    padding: 0.8rem;
+    font-style: italic;
+    color: $gray-color;
   }
 }
 #provider-select-all-wrapper {

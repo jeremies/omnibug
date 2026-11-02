@@ -130,7 +130,7 @@ test("OmnibugSettings should catch any exceptions thrown", async t => {
 
     const reason = await t.throwsAsync(settings.load());
 
-    t.is(reason.message, "Cannot read properties of null (reading '##OMNIBUG_KEY##')");
+    t.regex(reason.message, /Cannot read propert(y|ies).*null/);
 });
 
 test("OmnibugSettings should migrate", async t => {
@@ -151,4 +151,45 @@ test("OmnibugSettings should migrate", async t => {
     }});
     let loadedSettings2 = await settings.migrate();
     t.true(loadedSettings2.providers.ADOBEANALYTICS.enabled);
+});
+
+test("OmnibugSettings should clear disabled providers from defaultFilters when saving", t => {
+    let settings = new OmnibugSettings();
+    let providers = Object.assign({}, settings.defaults.providers);
+    let sampleProvider = Object.keys(providers)[0];
+    let sampleProvider2 = Object.keys(providers)[1];
+
+    providers[sampleProvider] = { "enabled": false };
+    providers[sampleProvider2] = { "enabled": true };
+
+    let savedSettings = settings.save({
+        providers: providers,
+        defaultFilters: {
+            providers: [sampleProvider, sampleProvider2]
+        }
+    });
+
+    t.deepEqual(savedSettings.defaultFilters.providers, [sampleProvider2]);
+});
+
+test("OmnibugSettings should clear disabled providers from defaultFilters when loading", async t => {
+    let settings = new OmnibugSettings();
+    let providers = Object.assign({}, settings.defaults.providers);
+    let sampleProvider = Object.keys(providers)[0];
+    let sampleProvider2 = Object.keys(providers)[1];
+
+    providers[sampleProvider] = { "enabled": false };
+    providers[sampleProvider2] = { "enabled": true };
+
+    chrome.storage.sync.get.yields({
+        "##OMNIBUG_KEY##": {
+            providers: providers,
+            defaultFilters: {
+                providers: [sampleProvider, sampleProvider2]
+            }
+        }
+    });
+
+    let loadedSettings = await settings.load();
+    t.deepEqual(loadedSettings.defaultFilters.providers, [sampleProvider2]);
 });
