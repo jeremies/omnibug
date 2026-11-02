@@ -314,11 +314,16 @@ window.Omnibug = (() => {
         });
         tracker.track(["send", "event", "filter requests", ((checked) ? "show" : "hide") + " all"]);
         updateFiltersStyles();
+        autoSaveDefaultProviderFilters();
     });
 
     // Clear filters
     d.getElementById("filter-reset-all").addEventListener("click", (event) => {
         event.preventDefault();
+        if (autoSaveDefaultFiltersTimeout) {
+            clearTimeout(autoSaveDefaultFiltersTimeout);
+            autoSaveDefaultFiltersTimeout = null;
+        }
         filters = { "providers": {}, "account": "", "accountType": "contains" };
         Object.keys(allProviders).forEach((key) => {
             filters.providers[key] = false;
@@ -330,8 +335,15 @@ window.Omnibug = (() => {
         buildProviderFilterPanel();
     });
 
-    // Default filter save
-    d.getElementById("filter-save-default").addEventListener("click", (event) => {
+    let autoSaveDefaultFiltersTimeout = null;
+
+    /**
+     * Save the default filters
+     *
+     * @param {boolean} includeAccount
+     * @param {boolean} showConfirmation
+     */
+    function saveDefaultFilters(includeAccount = true, showConfirmation = true) {
         let filterSettings = {},
             disabledProviders = [],
             enabledProviders = [];
@@ -351,7 +363,7 @@ window.Omnibug = (() => {
             filterSettings.providers = enabledProviders;
         }
 
-        if (filters.account) {
+        if (includeAccount && filters.account) {
             filterSettings.fields = {
                 "account": {
                     "value": filters.account,
@@ -360,12 +372,39 @@ window.Omnibug = (() => {
             };
         }
 
+        settings.defaultFilters = filterSettings;
+
         window.Omnibug.send_message({
             "type": "settings",
             "key": "defaultFilters",
             "value": filterSettings
         });
-        showToast("Default filter updated.", "success", 5);
+
+        if (showConfirmation) {
+            showToast("Default filter updated.", "success", 5);
+        }
+    }
+
+    /**
+     * Debounced auto-save of provider default filters
+     */
+    function autoSaveDefaultProviderFilters() {
+        if (autoSaveDefaultFiltersTimeout) {
+            clearTimeout(autoSaveDefaultFiltersTimeout);
+        }
+        autoSaveDefaultFiltersTimeout = setTimeout(() => {
+            saveDefaultFilters(false, false);
+            autoSaveDefaultFiltersTimeout = null;
+        }, 250);
+    }
+
+    // Default filter save
+    d.getElementById("filter-save-default").addEventListener("click", (event) => {
+        if (autoSaveDefaultFiltersTimeout) {
+            clearTimeout(autoSaveDefaultFiltersTimeout);
+            autoSaveDefaultFiltersTimeout = null;
+        }
+        saveDefaultFilters(true, true);
     });
 
     // Add our filter
@@ -1093,6 +1132,10 @@ window.Omnibug = (() => {
         let styleSheet = d.getElementById("settingsStyles");
         const defaults = (new OmnibugSettings).defaults;
 
+        let previousEnabledProviders = Object.keys((settings && settings.providers) || {}).filter((key) => {
+            return settings.providers[key] && settings.providers[key].enabled;
+        }).sort().join(",");
+
         settings = Object.assign({}, defaults, newSettings);
 
         let theme = settings.theme,
@@ -1166,8 +1209,14 @@ window.Omnibug = (() => {
             }
         }
 
+        let currentEnabledProviders = Object.keys((settings && settings.providers) || {}).filter((key) => {
+            return settings.providers[key] && settings.providers[key].enabled;
+        }).sort().join(",");
+
         // Build the filter list
-        buildProviderFilterPanel();
+        if (!storageLoadedSettings || previousEnabledProviders !== currentEnabledProviders) {
+            buildProviderFilterPanel();
+        }
 
         // Clear out any existing rules
         clearStyles(styleSheet);
@@ -1329,6 +1378,7 @@ window.Omnibug = (() => {
                         selectAllInput.checked = enabledProviders.every(k => filters.providers[k]);
                     }
                     updateFiltersStyles();
+                    autoSaveDefaultProviderFilters();
                 });
 
                 filters.providers[providerKey] = input.checked;
@@ -1348,6 +1398,23 @@ window.Omnibug = (() => {
 
         d.getElementById("filter-account").value = filters.account || "";
         d.getElementById("filter-account-type").value = ["contains", "starts", "ends", "exact"].includes(filters.accountType) ? filters.accountType : "contains";
+
+        // Reapply provider search if query exists
+        let searchInput = d.getElementById("provider-search");
+        if (searchInput && searchInput.value && providerSearch) {
+            let searchTerm = (searchInput.value || "").substring(0, 20),
+                results = providerSearch.search(searchTerm),
+                providers = providerList.querySelectorAll("li[data-provider]");
+            providers.forEach((provider) => {
+                if (results.find((searchProvider) => {
+                    return searchProvider.item.key === provider.getAttribute("data-provider");
+                }) !== undefined) {
+                    provider.classList.remove("d-none");
+                } else {
+                    provider.classList.add("d-none");
+                }
+            });
+        }
 
         // Finally, update our stylesheet with the new filters
         updateFiltersStyles(true);
