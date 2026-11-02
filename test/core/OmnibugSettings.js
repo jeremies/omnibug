@@ -33,6 +33,7 @@ test("OmnibugSettings should return a list of defaults", t => {
     t.is(typeof settings.defaults.showNavigation, "boolean");
     t.is(typeof settings.defaults.wrapText, "boolean");
     t.is(typeof settings.defaults.showNotes, "boolean");
+    t.is(typeof settings.defaults.persistRequests, "boolean");
     t.is(typeof settings.defaults.allowTracking, "boolean");
     t.is(typeof settings.defaults.requestSortOrder, "string");
     t.is(typeof settings.defaults.paramSortOrder, "string");

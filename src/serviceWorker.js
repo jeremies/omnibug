@@ -66,7 +66,7 @@ chrome.runtime.onConnect.addListener((port) => {
     port.onMessage.addListener((messages) => {
         messages.forEach((message) => {
             if (message.type === "settings") {
-                if (typeof message.key === "string" && message.value) {
+                if (typeof message.key === "string" && typeof message.value !== "undefined") {
                     settings.updateItem(message.key, message.value);
                 } else {
                     settings.save(message.value);

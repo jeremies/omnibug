@@ -417,6 +417,11 @@ window.Omnibug = (() => {
         event.preventDefault();
         d.body.classList.remove("persist-disabled");
         persist = true;
+        window.Omnibug.send_message({
+            "type": "settings",
+            "key": "persistRequests",
+            "value": true
+        });
     });
 
     // Persist requests on navigation
@@ -424,6 +429,11 @@ window.Omnibug = (() => {
         event.preventDefault();
         d.body.classList.add("persist-disabled");
         persist = false;
+        window.Omnibug.send_message({
+            "type": "settings",
+            "key": "persistRequests",
+            "value": false
+        });
     });
 
     // Export to CSV/Tab files
@@ -1122,6 +1132,12 @@ window.Omnibug = (() => {
                     }, {});
                 }
             }
+        }
+
+        // Apply persist setting on initial storage load
+        if (!storageLoadedSettings && fromStorage) {
+            persist = Boolean(settings.persistRequests);
+            d.body.classList.toggle("persist-disabled", !persist);
         }
 
         // Build the filter list

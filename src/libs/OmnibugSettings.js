@@ -99,6 +99,9 @@ class OmnibugSettings {
             // provider icons
             providerIcons: true,
 
+            // Persist requests across page navigation
+            persistRequests: true,
+
             // Context menu
             contextMenuBeta: true,
 
