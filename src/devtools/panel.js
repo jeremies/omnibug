@@ -16,7 +16,7 @@ window.Omnibug = (() => {
         settings = (new OmnibugSettings).defaults,
         requestPanel = d.getElementById("requests"),
         noRequests = d.getElementById("no-requests"),
-        filters = { "providers": {}, "account": "", "accountType": "contains" },
+        filters = { "providers": {}, "account": "", "accountType": "contains", "search": "" },
         persist = true,
         storageLoadedSettings = false,
         recordedData = [],
@@ -243,6 +243,42 @@ window.Omnibug = (() => {
         }
     });
 
+    // Add our listener for the inline search filter
+    let filterInput = d.getElementById("filter-input"),
+        filterClear = d.getElementById("filter-clear");
+    if (filterInput) {
+        filterInput.addEventListener("input", (event) => {
+            filters.search = event.target.value;
+            if (filters.search) {
+                if (filterClear) { filterClear.classList.remove("d-none"); }
+            } else {
+                if (filterClear) { filterClear.classList.add("d-none"); }
+            }
+            applySearchFilter();
+        });
+        filterInput.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" || event.keyCode === 27) {
+                event.preventDefault();
+                filterInput.value = "";
+                filters.search = "";
+                if (filterClear) { filterClear.classList.add("d-none"); }
+                applySearchFilter();
+            }
+        });
+    }
+    if (filterClear) {
+        filterClear.addEventListener("click", (event) => {
+            event.preventDefault();
+            if (filterInput) {
+                filterInput.value = "";
+                filterInput.focus();
+            }
+            filters.search = "";
+            filterClear.classList.add("d-none");
+            applySearchFilter();
+        });
+    }
+
     // Add our listener for the account filter
     let filterAccount = d.getElementById("filter-account"),
         filterAccountType = d.getElementById("filter-account-type");
@@ -411,8 +447,18 @@ window.Omnibug = (() => {
             exportData = exportData.filter((request) => {
                 if (request.event === "webNavigation") { return true; }
                 let account = getMappedColumnValue("account", request);
-                return filters.providers[request.provider.key] === true
+                let modalMatch = filters.providers[request.provider.key] === true
                     && ((!filters.account && !account) || (account && account.indexOf(filters.account) !== -1));
+                if (!modalMatch) {
+                    return false;
+                }
+                if (filters.search) {
+                    let searchText = request._searchText || getRequestSearchText(request);
+                    if (!searchText.includes(filters.search.trim().toLowerCase())) {
+                        return false;
+                    }
+                }
+                return true;
             });
         }
 
@@ -457,9 +503,9 @@ window.Omnibug = (() => {
                 }
                 row.push(request.request.url.replace(/"/g, `\\"`));
                 if (typeof request.request.postData === "object" && request.request.postData) {
-                    row.push(JSON.stringify(request.request.postData).replace(/"/g, '""'));
+                    row.push(JSON.stringify(request.request.postData).replace(/"/g, "\"\""));
                 } else if(typeof request.request.postData === "string") {
-                    row.push(request.request.postData.replace(/"/g, '""'));
+                    row.push(request.request.postData.replace(/"/g, "\"\""));
                 } else {
                     row.push("");
                 }
@@ -555,7 +601,11 @@ window.Omnibug = (() => {
     function addRequest(request) {
         noRequests.classList.add("d-none");
         recordedData.push(request);
-        requestPanel.appendChild(buildRequest(request));
+        let requestEl = buildRequest(request);
+        if (filters.search && !request._searchText.includes(filters.search.trim().toLowerCase())) {
+            requestEl.classList.add("search-hidden");
+        }
+        requestPanel.appendChild(requestEl);
     }
 
     /**
@@ -614,6 +664,57 @@ window.Omnibug = (() => {
             }
         }
         return value;
+    }
+
+    /**
+     * Get search text for a request
+     *
+     * @param request
+     * @return {string}
+     */
+    function getRequestSearchText(request) {
+        if (!request || request.event === "webNavigation") {
+            return (request && request.request && request.request.url) ? request.request.url.toLowerCase() : "";
+        }
+        let parts = [];
+        // Provider name
+        if (request.provider && request.provider.name) {
+            parts.push(request.provider.name);
+        }
+        // Request type
+        let requestTypeValue;
+        if (request.provider && request.provider.columns && request.provider.columns.requestType && request.data) {
+            requestTypeValue = request.data.find((el) => el.key === request.provider.columns.requestType);
+        }
+        parts.push(requestTypeValue && requestTypeValue.value ? requestTypeValue.value : "Other");
+
+        // Account
+        let accountValue = getMappedColumnValue("account", request);
+        if (accountValue) {
+            parts.push(accountValue);
+        }
+
+        // Additional summary fields
+        if (settings.additionalSummary && settings.additionalSummary.length > 0) {
+            settings.additionalSummary.forEach((fld) => {
+                let val = getDataColumnValue(fld, request);
+                if (val) {
+                    parts.push(val);
+                }
+            });
+        }
+
+        // Timestamp
+        if (request.request && request.request.timestamp) {
+            parts.push(new Date(request.request.timestamp).toLocaleString());
+        }
+
+        // Request URL
+        if (request.request && request.request.url) {
+            parts.push(request.request.url);
+        }
+
+        return parts.join(" ").toLowerCase();
     }
 
     /**
@@ -835,6 +936,10 @@ window.Omnibug = (() => {
             }
         });
         details.appendChild(body);
+
+        let searchText = getRequestSearchText(request);
+        request._searchText = searchText;
+        details._searchText = searchText;
 
         return details;
     }
@@ -1223,6 +1328,33 @@ window.Omnibug = (() => {
         } else {
             d.body.classList.remove("filters-active");
         }
+    }
+
+    /**
+     * Apply the search filter to all requests
+     */
+    function applySearchFilter() {
+        let query = (filters.search || "").trim().toLowerCase();
+        let requests = requestPanel.querySelectorAll(".request");
+        requests.forEach((el) => {
+            if (!query) {
+                el.classList.remove("search-hidden");
+            } else {
+                let searchText = el._searchText;
+                if (typeof searchText === "undefined") {
+                    let reqId = el.getAttribute("data-request-id"),
+                        timestamp = el.getAttribute("data-timestamp"),
+                        req = recordedData.find((r) => r.event === "webRequest" && String(r.request.id) === reqId && String(r.request.timestamp) === timestamp);
+                    searchText = req ? getRequestSearchText(req) : el.innerText.toLowerCase();
+                    el._searchText = searchText;
+                }
+                if (searchText.includes(query)) {
+                    el.classList.remove("search-hidden");
+                } else {
+                    el.classList.add("search-hidden");
+                }
+            }
+        });
     }
 
     return {

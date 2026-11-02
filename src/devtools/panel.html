@@ -15,6 +15,13 @@
             <section class="navbar-section">
                  <a href="#clear" class="btn btn-link tooltip tooltip-right" aria-label="Clear Requests" data-tooltip="Clear Requests"><i class="fas fa-trash"></i></a>
             </section>
+            <section class="navbar-section navbar-filter-section">
+                <div class="navbar-filter-wrapper">
+                    <i class="form-icon-left fas fa-search"></i>
+                    <input type="text" id="filter-input" class="form-input input-sm" placeholder="Filter requests…" autocomplete="off" spellcheck="false" aria-label="Filter requests">
+                    <button type="button" id="filter-clear" class="btn-filter-clear d-none" aria-label="Clear filter" title="Clear filter">&times;</button>
+                </div>
+            </section>
             <section class="navbar-section">
                 <a href="#enable-persist" class="btn btn-link tooltip tooltip-left" id="persist-enable" data-tooltip="Click to persist requests across pages." aria-label="Requests will be cleared between page loads. Click to persist them instead."><i class="fas fa-history"></i></a>
                 <a href="#disable-persist" class="btn btn-link tooltip tooltip-left" id="persist-disable" data-tooltip="Click to clear requests between pages." aria-label="Requests are persisted across pages. Click to clear them between pages instead."><i class="fas fa-history"></i></a>

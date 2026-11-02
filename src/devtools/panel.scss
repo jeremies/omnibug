@@ -50,8 +50,22 @@ nav.navbar {
   background: $white;
   border-bottom: 1px solid $border-color;
 
-  .navbar-section:last-of-type a.btn {
-    border-left: 1px solid #eee;
+  .navbar-section:first-of-type {
+    flex: 0 0 auto;
+  }
+
+  .navbar-section.navbar-filter-section {
+    flex: 1 1 auto;
+    padding: 0 8px;
+    align-items: center;
+  }
+
+  .navbar-section:last-of-type {
+    flex: 0 0 auto;
+
+    a.btn {
+      border-left: 1px solid #eee;
+    }
   }
 
   .btn.btn-link {
@@ -61,6 +75,67 @@ nav.navbar {
   .btn.btn-link:hover {
     color: $primary-color-dark;
   }
+}
+
+.navbar-filter-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+
+  .form-icon-left {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    font-size: 11px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .form-input {
+    width: 100%;
+    height: 26px;
+    line-height: 18px;
+    padding: 3px 26px 3px 26px;
+    font-size: 12px;
+    border-radius: 3px;
+    border: 1px solid $border-color;
+    box-shadow: none;
+
+    &:focus {
+      border-color: $primary-color;
+    }
+  }
+
+  .btn-filter-clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: #999;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover, &:focus {
+      color: #333;
+    }
+  }
+}
+
+.request.search-hidden {
+  display: none !important;
 }
 #no-requests {
   animation: fadein 2s;
@@ -424,6 +499,34 @@ body.dark {
     border-bottom: 1px solid $dark-body-background-color;
     .navbar-section:last-of-type a.btn {
       border-left: 1px solid $dark-body-background-color;
+    }
+  }
+
+  .navbar-filter-wrapper {
+    .form-icon-left {
+      color: #666;
+    }
+
+    .form-input {
+      background-color: $dark-body-background-color;
+      color: #ccc;
+      border: 1px solid #444;
+
+      &:focus {
+        border-color: $primary-color;
+      }
+
+      &::placeholder {
+        color: #666;
+      }
+    }
+
+    .btn-filter-clear {
+      color: #777;
+
+      &:hover, &:focus {
+        color: #ccc;
+      }
     }
   }
 
