@@ -330,7 +330,7 @@ module.exports = function (grunt) {
         });
         grunt.config.set("concat.test-helpers", {
             "options": {
-                "footer": "\nexport { createElement, clearStyles, clearChildren };"
+                "footer": "\nexport { createElement, clearStyles, clearChildren, getDataColumnValue };"
             },
             "files": {
                 "./test/source/helpers.js": [

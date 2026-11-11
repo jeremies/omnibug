@@ -1,4 +1,4 @@
-/* global OmnibugSettings, OmnibugProvider, OmnibugTracker, createElement, clearStyles, clearChildren, showToast, getAppropriateTextColor, Fuse */
+/* global OmnibugSettings, OmnibugProvider, OmnibugTracker, createElement, clearStyles, clearChildren, showToast, getAppropriateTextColor, getDataColumnValue, Fuse */
 
 /*
  * Omnibug
@@ -694,28 +694,6 @@ window.Omnibug = (() => {
             });
             if (value) {
                 value = value.value;
-            }
-        }
-        return value;
-    }
-
-    /**
-     * Get value from data
-     * 
-     * @param field
-     * @param request 
-     * @return {string}
-     */
-    function getDataColumnValue(field, request) {
-        let value = "";
-        if (request.data) {
-            value = request.data.find((fld) => {
-                return fld.field === field;
-            });
-            if (value) {
-                value = value.value;
-            } else {
-                value = "";
             }
         }
         return value;

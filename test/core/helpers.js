@@ -1,6 +1,6 @@
 import test from 'ava';
 
-import { createElement, clearStyles, clearChildren } from "./../source/helpers.js";
+import { createElement, clearStyles, clearChildren, getDataColumnValue } from "./../source/helpers.js";
 
 /*
  * --------- createElement ---------------------------------------------------------------------------------------------
@@ -199,4 +199,149 @@ test("clearChildren should throw an error when passed a non-HTML element", t => 
     }, TypeError);
 
     t.is(error.message, "Parameter is not an HTMLElement");
+});
+
+/*
+ * --------- getDataColumnValue ----------------------------------------------------------------------------------------
+ */
+test("getDataColumnValue should return direct parameter value", t => {
+    let request = {
+        "data": [
+            { "field": "Events", "value": "event1" },
+            { "field": "Page Name", "value": "Home" }
+        ]
+    };
+
+    t.is(getDataColumnValue("Events", request), "event1");
+    t.is(getDataColumnValue("Page Name", request), "Home");
+    t.is(getDataColumnValue("Missing", request), "");
+    t.is(getDataColumnValue("", request), "");
+    t.is(getDataColumnValue("Events", {}), "");
+});
+
+test("getDataColumnValue should extract JSON keys using dot notation", t => {
+    let request = {
+        "data": [
+            {
+                "field": "param1",
+                "value": JSON.stringify({
+                    "subparam2": "value2",
+                    "nested": {
+                        "subsubparam3": "value3"
+                    }
+                })
+            }
+        ]
+    };
+
+    t.is(getDataColumnValue("param1.subparam2", request), "value2");
+    t.is(getDataColumnValue("param1.nested.subsubparam3", request), "value3");
+    t.is(getDataColumnValue("param1.nested.missing", request), "");
+});
+
+test("getDataColumnValue should extract nested stringified JSON values", t => {
+    let request = {
+        "data": [
+            {
+                "field": "param1",
+                "value": JSON.stringify({
+                    "subparam2": JSON.stringify({
+                        "subsubparam3": "value3"
+                    })
+                })
+            }
+        ]
+    };
+
+    t.is(getDataColumnValue("param1.subparam2.subsubparam3", request), "value3");
+});
+
+test("getDataColumnValue should extract JSON keys with dots using bracket notation", t => {
+    let request = {
+        "data": [
+            {
+                "field": "param1",
+                "value": JSON.stringify({
+                    "sub.param.2": {
+                        "sub.sub.param.3": "value3"
+                    },
+                    "quote\"key": "quotedValue"
+                })
+            }
+        ]
+    };
+
+    t.is(getDataColumnValue("param1[\"sub.param.2\"][\"sub.sub.param.3\"]", request), "value3");
+    t.is(getDataColumnValue("param1['sub.param.2']['sub.sub.param.3']", request), "value3");
+    t.is(getDataColumnValue("param1[\"quote\\\"key\"]", request), "quotedValue");
+});
+
+test("getDataColumnValue should support mixed dot, bracket, and array index paths", t => {
+    let request = {
+        "data": [
+            {
+                "field": "param1",
+                "value": JSON.stringify({
+                    "items": [
+                        { "id": 10, "meta.info": { "label": "First" } },
+                        { "id": 20, "meta.info": { "label": "Second" } }
+                    ]
+                })
+            }
+        ]
+    };
+
+    t.is(getDataColumnValue("param1.items[0].id", request), "10");
+    t.is(getDataColumnValue("param1.items[1][\"meta.info\"].label", request), "Second");
+    t.is(getDataColumnValue("param1.items[5].id", request), "");
+});
+
+test("getDataColumnValue should support base parameter names containing dots or brackets", t => {
+    let request = {
+        "data": [
+            {
+                "field": "events[0].xdm.data",
+                "value": JSON.stringify({ "subparam2": "value2" })
+            },
+            {
+                "field": "my.dotted.param",
+                "value": JSON.stringify({ "key": "dottedVal" })
+            }
+        ]
+    };
+
+    t.is(getDataColumnValue("events[0].xdm.data", request), "{\"subparam2\":\"value2\"}");
+    t.is(getDataColumnValue("events[0].xdm.data.subparam2", request), "value2");
+    t.is(getDataColumnValue("my.dotted.param.key", request), "dottedVal");
+    t.is(getDataColumnValue("[\"my.dotted.param\"].key", request), "dottedVal");
+});
+
+test("getDataColumnValue should format non-string values and handle invalid JSON or paths", t => {
+    let request = {
+        "data": [
+            {
+                "field": "param1",
+                "value": JSON.stringify({
+                    "num": 42,
+                    "bool": false,
+                    "nil": null,
+                    "obj": { "a": 1 },
+                    "arr": [1, 2]
+                })
+            },
+            {
+                "field": "notJson",
+                "value": "plain text"
+            }
+        ]
+    };
+
+    t.is(getDataColumnValue("param1.num", request), "42");
+    t.is(getDataColumnValue("param1.bool", request), "false");
+    t.is(getDataColumnValue("param1.nil", request), "");
+    t.is(getDataColumnValue("param1.obj", request), "{\"a\":1}");
+    t.is(getDataColumnValue("param1.arr", request), "[1,2]");
+    t.is(getDataColumnValue("notJson.sub", request), "");
+    t.is(getDataColumnValue("param1..num", request), "");
+    t.is(getDataColumnValue("param1[\"unclosed]", request), "");
 });
