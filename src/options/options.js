@@ -260,6 +260,9 @@
 
         event.target.value = "";
     });
+
+    setupDraggableList(document.getElementById("highlight-params"), "highlightKeys");
+    setupDraggableList(document.getElementById("addSummary-params"), "additionalSummary");
     
     document.getElementById("renameParam").addEventListener("focus", (event) => {
         document.getElementById("renameParamStatus").innerHTML = "";
@@ -375,16 +378,22 @@
                 "classes": ["remove"],
                 "attributes": {
                     "title": "Remove",
-                    "aria-label": "Remove"
+                    "aria-label": "Remove",
+                    "draggable": "false"
                 },
                 "text": "\u00D7"
             }),
             li = createElement("li", {
+                "attributes": {
+                    "draggable": "true",
+                    "data-param": param
+                },
                 "children": [text, remove]
             });
 
         remove.addEventListener("click", (event) => {
             event.preventDefault();
+            event.stopPropagation();
             settings.highlightKeys = settingsObj.highlightKeys = settingsObj.highlightKeys.filter(item => item !== param);
             settingsProvider.save(settingsObj);
             tracker.track(["send", "event", "settings", "highlightKeys", `removed: ${param}`]);
@@ -401,22 +410,120 @@
                 "classes": ["remove"],
                 "attributes": {
                     "title": "Remove",
-                    "aria-label": "Remove"
+                    "aria-label": "Remove",
+                    "draggable": "false"
                 },
                 "text": "\u00D7"
             }),
             li = createElement("li", {
+                "attributes": {
+                    "draggable": "true",
+                    "data-param": param
+                },
                 "children": [text, remove]
             });
 
         remove.addEventListener("click", (event) => {
             event.preventDefault();
+            event.stopPropagation();
             settings.additionalSummary = settingsObj.additionalSummary = settingsObj.additionalSummary.filter(item => item !== param);
             settingsProvider.save(settingsObj);
             tracker.track(["send", "event", "settings", "additionalSummary", `removed: ${param}`]);
         });
 
         return li;
+    }
+
+    /**
+     * Enable drag-and-drop reordering for a list of parameter chips
+     *
+     * @param {HTMLElement} listElement List container element (ul)
+     * @param {string} settingKey Name of the setting property
+     */
+    function setupDraggableList(listElement, settingKey) {
+        if(!listElement) {
+            return;
+        }
+
+        let draggedElement = null,
+            originalOrder = [];
+
+        function handleDragEnd() {
+            if(draggedElement) {
+                draggedElement.classList.remove("dragging");
+                draggedElement = null;
+                settings[settingKey] = settingsObj[settingKey] = originalOrder;
+            }
+        }
+
+        listElement.addEventListener("dragstart", (event) => {
+            let li = event.target.closest("li");
+            if(!li || li.parentNode !== listElement || event.target.closest(".remove")) {
+                event.preventDefault();
+                return;
+            }
+            draggedElement = li;
+            originalOrder = Array.from(listElement.querySelectorAll("li")).map(el => el.getAttribute("data-param"));
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", li.getAttribute("data-param") || "");
+
+            li.addEventListener("dragend", handleDragEnd, { once: true });
+
+            setTimeout(() => {
+                if(draggedElement) {
+                    draggedElement.classList.add("dragging");
+                }
+            }, 0);
+        });
+
+        listElement.addEventListener("dragover", (event) => {
+            if(!draggedElement) {
+                return;
+            }
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+
+            let targetLi = event.target.closest("li");
+            if(targetLi && targetLi !== draggedElement && targetLi.parentNode === listElement) {
+                let rect = targetLi.getBoundingClientRect(),
+                    midpointX = rect.left + rect.width / 2;
+                if(event.clientX < midpointX) {
+                    listElement.insertBefore(draggedElement, targetLi);
+                } else {
+                    listElement.insertBefore(draggedElement, targetLi.nextSibling);
+                }
+            } else if(!targetLi && (event.target === listElement || event.target.parentNode === listElement)) {
+                let children = Array.from(listElement.querySelectorAll("li:not(.dragging)"));
+                if(children.length === 0) {
+                    listElement.appendChild(draggedElement);
+                } else {
+                    let lastChild = children[children.length - 1],
+                        rect = lastChild.getBoundingClientRect();
+                    if(event.clientX > rect.right || event.clientY > rect.bottom) {
+                        listElement.appendChild(draggedElement);
+                    }
+                }
+            }
+        });
+
+        listElement.addEventListener("drop", (event) => {
+            if(!draggedElement) {
+                return;
+            }
+            event.preventDefault();
+            let newOrder = Array.from(listElement.querySelectorAll("li")).map(el => el.getAttribute("data-param"));
+            draggedElement.classList.remove("dragging");
+            draggedElement = null;
+
+            let changed = newOrder.length !== originalOrder.length ||
+                          newOrder.some((val, idx) => val !== originalOrder[idx]);
+            if(changed) {
+                settings[settingKey] = settingsObj[settingKey] = newOrder;
+                settingsProvider.save(settingsObj);
+            }
+        });
+
+        listElement.addEventListener("dragend", handleDragEnd);
     }
     /**
      * Load in new settings/styles
